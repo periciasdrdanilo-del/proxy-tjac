@@ -54,7 +54,7 @@ def proxy():
         r = requests.request(url=url, **kw)
         return jsonify(
             status=r.status_code,
-            headers=dict(r.headers),
+            headers=[[k, v] for k, v in r.raw.headers.items()],
             body_b64=base64.b64encode(r.content).decode(),
         )
     except Exception as e:
