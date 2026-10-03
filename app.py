@@ -4,14 +4,6 @@ import requests
 import urllib3
 urllib3.disable_warnings()
 
-def fix_redirect(x, encoding='utf-8'):
-    if isinstance(x, bytes):
-        try: return x.decode(encoding)
-        except Exception: return x.decode('latin-1')
-    return x
-requests.models.to_native_string = fix_redirect
-import requests.sessions as rs
-rs.to_native_string = fix_redirect
 app = Flask(__name__)
 TOKEN = os.environ.get("PROXY_TOKEN", "")
 CERT_B64 = os.environ.get("EPROC_CERT_B64", "")
@@ -40,7 +32,10 @@ def proxy():
     headers = b.get("headers", {})
     body = b.get("body")
     use_cert = b.get("cert", False)
-    kw = dict(method=method, headers=headers, timeout=b.get("timeout", 60), verify=False)
+    for h in ("host", "connection", "content-length"):
+        headers.pop(h, None)
+    kw = dict(method=method, headers=headers, timeout=b.get("timeout", 60),
+              verify=False, allow_redirects=False)
     if body:
         kw["data"] = base64.b64decode(body) if isinstance(body, str) else body
     if use_cert:
@@ -48,13 +43,16 @@ def proxy():
         if not cp:
             return jsonify(error="certificado nao configurado"), 500
         kw["cert"] = cp
-    for h in ("host", "connection", "content-length"):
-        headers.pop(h, None)
     try:
         r = requests.request(url=url, **kw)
+        try:
+            set_cookies = r.raw.headers.getlist("Set-Cookie")
+        except Exception:
+            set_cookies = []
         return jsonify(
             status=r.status_code,
-            headers=[[k, v] for k, v in r.raw.headers.items()],
+            headers={k: v for k, v in r.headers.items()},
+            set_cookies=set_cookies,
             body_b64=base64.b64encode(r.content).decode(),
         )
     except Exception as e:
