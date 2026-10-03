@@ -10,7 +10,8 @@ def fix_redirect(x, encoding='utf-8'):
         except Exception: return x.decode('latin-1')
     return x
 requests.models.to_native_string = fix_redirect
-
+import requests.sessions as rs
+rs.to_native_string = fix_redirect
 app = Flask(__name__)
 TOKEN = os.environ.get("PROXY_TOKEN", "")
 CERT_B64 = os.environ.get("EPROC_CERT_B64", "")
